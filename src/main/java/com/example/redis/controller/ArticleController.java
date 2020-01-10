@@ -22,7 +22,7 @@ import java.util.Map;
 @RestController
 public class ArticleController {
     @Autowired
-    private StringRedisTemplate redisTemplate;
+    private RedisTemplate redisTemplate;
 
     @GetMapping("/articles")
     public List<Article> list() {
