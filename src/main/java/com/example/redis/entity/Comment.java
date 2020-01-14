@@ -14,6 +14,7 @@ public class Comment {
     private String user;
     private String contact;
     private String content;
+    private Long pid;
     //审核状态
     private Long status;
 

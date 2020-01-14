@@ -8,8 +8,11 @@ import org.springframework.data.redis.core.BoundHashOperations;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.hash.HashMapper;
+import org.springframework.data.redis.hash.Jackson2HashMapper;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -38,16 +41,22 @@ public class ArticleController {
     }
     @GetMapping("/articles/{id}")
     public Article get(@PathVariable Integer id) {
-        Map<Object,Object> articleMap = redisTemplate.boundHashOps("article:" + id).entries();
-        Article article = BeanUtil.mapToBean(articleMap, Article.class, true);
+        Map<String,Object> articleMap = redisTemplate.boundHashOps("article:" + id).entries();
+        Jackson2HashMapper mapper = new Jackson2HashMapper(false);
+        Article article = (Article) mapper.fromHash(articleMap);
         return article;
     }
     @PostMapping("/articles")
     public String add(Article article) {
         Long id = redisTemplate.opsForValue().increment("article:count");
+        article.setId(id);
+        article.setCreateTime(LocalDateTime.now());
+        article.setUpdateTime(LocalDateTime.now());
         redisTemplate.opsForList().leftPush("article:list",id.toString());
         String key = "article:" + id;
-        redisTemplate.opsForHash().putAll(key, BeanUtil.beanToMap(article));
+        Jackson2HashMapper mapper = new Jackson2HashMapper(false);
+        Map<String, Object> toHash = mapper.toHash(article);
+        redisTemplate.opsForHash().putAll(key, toHash);
 
         return "文章添加成功！id为"+id;
     }

@@ -1,5 +1,6 @@
 package com.example.redis.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -20,6 +21,7 @@ public class Article {
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
     private Long status;
+    @JsonIgnore
     private List<String> tags;
     private List<Comment> comments;
 }
