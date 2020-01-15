@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * @Auther: mingweilin
@@ -34,7 +35,7 @@ public class ArticleController {
     public List<Article> list() {
         Jackson2HashMapper mapper = new Jackson2HashMapper(false);
         List<Article> articles = new ArrayList<>();
-        List<String> ids = redisTemplate.opsForList().range("article:list", 0, -1);
+        List<Integer> ids = redisTemplate.opsForList().range("article:list", 0, -1);
         ids.forEach(id ->{
             Map<String,Object> articleMap = redisTemplate.boundHashOps("article:" + id).entries();
             Article article = (Article) mapper.fromHash(articleMap);
@@ -45,7 +46,10 @@ public class ArticleController {
     @GetMapping("/articles/{id}")
     public Article get(@PathVariable Integer id) {
         Map<String,Object> articleMap = redisTemplate.boundHashOps("article:" + id).entries();
-        Article article = (Article) mapper.fromHash(articleMap);
+        Article article = null;
+        if (Objects.nonNull(articleMap) && articleMap.size() !=0) {
+            article = (Article) mapper.fromHash(articleMap);
+        }
         return article;
     }
     @PostMapping("/articles")
@@ -54,7 +58,7 @@ public class ArticleController {
         article.setId(id);
         article.setCreateTime(LocalDateTime.now());
         article.setUpdateTime(LocalDateTime.now());
-        redisTemplate.opsForList().leftPush("article:list",id.toString());
+        redisTemplate.opsForList().leftPush("article:list",id);
         String key = "article:" + id;
         Map<String, Object> toHash = mapper.toHash(article);
         redisTemplate.opsForHash().putAll(key, toHash);

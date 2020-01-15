@@ -32,7 +32,7 @@ public class RedisConfig {
         template.setValueSerializer(jackson2JsonRedisSerializer);
         template.setHashKeySerializer(stringRedisSerializer);
         template.setHashValueSerializer(jackson2JsonRedisSerializer);
-        template.setDefaultSerializer(jackson2JsonRedisSerializer);
+//        template.setDefaultSerializer(jackson2JsonRedisSerializer);
         template.afterPropertiesSet();
         return template;
     }
