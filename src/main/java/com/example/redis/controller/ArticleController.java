@@ -27,14 +27,17 @@ public class ArticleController {
     @Autowired
     private RedisTemplate redisTemplate;
 
+    private Jackson2HashMapper mapper = new Jackson2HashMapper(false);
+
+
     @GetMapping("/articles")
     public List<Article> list() {
-        HashOperations forHash = redisTemplate.opsForHash();
+        Jackson2HashMapper mapper = new Jackson2HashMapper(false);
         List<Article> articles = new ArrayList<>();
         List<String> ids = redisTemplate.opsForList().range("article:list", 0, -1);
         ids.forEach(id ->{
-            Map<Object,Object> articleMap = redisTemplate.boundHashOps("article:" + id).entries();
-            Article article = BeanUtil.mapToBean(articleMap, Article.class, true);
+            Map<String,Object> articleMap = redisTemplate.boundHashOps("article:" + id).entries();
+            Article article = (Article) mapper.fromHash(articleMap);
             articles.add(article);
         });
         return articles;
@@ -42,7 +45,6 @@ public class ArticleController {
     @GetMapping("/articles/{id}")
     public Article get(@PathVariable Integer id) {
         Map<String,Object> articleMap = redisTemplate.boundHashOps("article:" + id).entries();
-        Jackson2HashMapper mapper = new Jackson2HashMapper(false);
         Article article = (Article) mapper.fromHash(articleMap);
         return article;
     }
@@ -54,7 +56,6 @@ public class ArticleController {
         article.setUpdateTime(LocalDateTime.now());
         redisTemplate.opsForList().leftPush("article:list",id.toString());
         String key = "article:" + id;
-        Jackson2HashMapper mapper = new Jackson2HashMapper(false);
         Map<String, Object> toHash = mapper.toHash(article);
         redisTemplate.opsForHash().putAll(key, toHash);
 
@@ -64,7 +65,8 @@ public class ArticleController {
     @PutMapping("/articles/{id}")
     public String update(Article article) {
         String key = "article:" + article.getId();
-        redisTemplate.opsForHash().putAll(key, BeanUtil.beanToMap(article));
+        article.setUpdateTime(LocalDateTime.now());
+        redisTemplate.opsForHash().putAll(key, mapper.toHash(article) );
         return "文章更新成功，id为："+article.getId();
     }
 
@@ -72,6 +74,7 @@ public class ArticleController {
     public String delete(@PathVariable Integer id) {
         String key = "article:" + id;
         redisTemplate.delete(key);
+        redisTemplate.opsForList().remove("article:list",0,id);
         return "文章删除成功！id为："+id;
     }
 }

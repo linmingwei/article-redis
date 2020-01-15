@@ -25,13 +25,14 @@ public class RedisConfig {
         template.setConnectionFactory(factory);
         ObjectMapper om = new ObjectMapper();
         om.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
-        om.enableDefaultTyping(ObjectMapper.DefaultTyping.NON_FINAL);
+//        om.enableDefaultTyping(ObjectMapper.DefaultTyping.NON_FINAL);
         GenericJackson2JsonRedisSerializer jackson2JsonRedisSerializer = new GenericJackson2JsonRedisSerializer(om);
         StringRedisSerializer stringRedisSerializer = new StringRedisSerializer();
         template.setKeySerializer(stringRedisSerializer);
         template.setValueSerializer(jackson2JsonRedisSerializer);
         template.setHashKeySerializer(stringRedisSerializer);
         template.setHashValueSerializer(jackson2JsonRedisSerializer);
+        template.setDefaultSerializer(jackson2JsonRedisSerializer);
         template.afterPropertiesSet();
         return template;
     }

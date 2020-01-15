@@ -21,7 +21,6 @@ public class Article {
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
     private Long status;
-    @JsonIgnore
     private List<String> tags;
     private List<Comment> comments;
 }
