@@ -1,5 +1,6 @@
 package com.example.redis.entity;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import lombok.Data;
 
@@ -9,8 +10,8 @@ import lombok.Data;
  * @Description:
  */
 @Data
-@JsonTypeInfo(use = JsonTypeInfo.Id.NONE)
-public class Comment {
+@JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+public class Comment extends BaseEntity {
     private Long id;
     private Long articleId;
     private String user;

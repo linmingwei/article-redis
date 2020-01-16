@@ -13,16 +13,12 @@ import java.util.List;
  * @Description:
  */
 @Data
-public class Article {
+public class Article  extends BaseEntity{
     private Long id;
     private String title;
     private String content;
     private String author;
-    private LocalDateTime createTime;
-    private LocalDateTime updateTime;
     private Long status;
-    @JsonIgnore
     private List<String> tags;
-    @JsonIgnore
     private List<Comment> comments;
 }

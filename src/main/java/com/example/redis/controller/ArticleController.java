@@ -1,15 +1,10 @@
 package com.example.redis.controller;
 
-import cn.hutool.core.bean.BeanUtil;
 import com.example.redis.entity.Article;
 import com.example.redis.entity.Comment;
-import org.springframework.beans.BeanUtils;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.BoundHashOperations;
-import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.hash.HashMapper;
 import org.springframework.data.redis.hash.Jackson2HashMapper;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,12 +21,14 @@ public class ArticleController {
     @Autowired
     private RedisTemplate redisTemplate;
 
-    private Jackson2HashMapper mapper = new Jackson2HashMapper(false);
+    private Jackson2HashMapper hashMapper = new Jackson2HashMapper(false);
+    private ObjectMapper objectMapper = new ObjectMapper();
 
 
     @GetMapping("/articles")
     public List<Article> list() {
-        Jackson2HashMapper mapper = new Jackson2HashMapper(false);
+        Jackson2HashMapper mapper;
+        mapper = new Jackson2HashMapper(false);
         List<Article> articles = new ArrayList<>();
         List<Integer> ids = redisTemplate.opsForList().range("article:list", 0, -1);
         if (ids == null || ids.size() == 0) {
@@ -51,11 +48,13 @@ public class ArticleController {
         Map<String, Object> articleMap = redisTemplate.boundHashOps("article:" + id).entries();
         Article article = null;
         if (Objects.nonNull(articleMap) && articleMap.size() != 0) {
-            article = (Article) mapper.fromHash(articleMap);
+            article = (Article) hashMapper.fromHash(articleMap);
         }
         setComments(article);
+        setTags(article);
         return article;
     }
+
 
     @PostMapping("/articles")
     public String add(Article article) {
@@ -65,7 +64,7 @@ public class ArticleController {
         article.setUpdateTime(LocalDateTime.now());
         redisTemplate.opsForList().leftPush("article:list", id);
         String key = "article:" + id;
-        Map<String, Object> toHash = mapper.toHash(article);
+        Map<String, Object> toHash = hashMapper.toHash(article);
         redisTemplate.opsForHash().putAll(key, toHash);
         List<String> tags = article.getTags();
         if (tags != null && tags.size() != 0) {
@@ -79,7 +78,7 @@ public class ArticleController {
     public String update(Article article) {
         String key = "article:" + article.getId();
         article.setUpdateTime(LocalDateTime.now());
-        redisTemplate.opsForHash().putAll(key, mapper.toHash(article));
+        redisTemplate.opsForHash().putAll(key, hashMapper.toHash(article));
         return "文章更新成功，id为：" + article.getId();
     }
 
@@ -94,10 +93,13 @@ public class ArticleController {
     private Article setComments(Article article) {
         Map<String, Object> commentMap = redisTemplate.boundHashOps("article:" + article.getId() + ":comments").entries();
         List<Comment> comments = new ArrayList<>();
-        commentMap.forEach((key, value) -> {
-            comments.add((Comment) mapper.fromHash((Map<String, Object>) value));
-        });
+        commentMap.entrySet().stream().forEach(e-> comments.add(objectMapper.convertValue(e.getValue(),Comment.class)));
         article.setComments(comments);
         return  article;
     }
+
+    private void setTags(Article article) {
+
+    }
+
 }
