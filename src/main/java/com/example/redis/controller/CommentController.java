@@ -7,6 +7,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Objects;
 
 @RestController
 @RequestMapping("/comments")
@@ -19,11 +20,8 @@ public class CommentController {
         if (comment.getArticleId() == null || StringUtils.isEmpty(comment.getContent())) {
             return null;
         }
-        List<Integer> articleIds = redisTemplate.opsForList().range("article:list", 0, -1);
-        assert articleIds != null;
-        if (!articleIds.contains(comment.getArticleId().intValue())) {
-            return "文章不存在";
-        }
+        Object aid = redisTemplate.opsForHash().get("article:" + comment.getArticleId(), "id");
+        if(Objects.isNull(aid)) return "文章不存在";
         Long id = redisTemplate.opsForValue().increment("comment:count");
         comment.setId(id);
 

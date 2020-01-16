@@ -51,7 +51,6 @@ public class ArticleController {
             article = (Article) hashMapper.fromHash(articleMap);
         }
         setComments(article);
-        setTags(article);
         return article;
     }
 
@@ -69,13 +68,32 @@ public class ArticleController {
         List<String> tags = article.getTags();
         if (tags != null && tags.size() != 0) {
             redisTemplate.opsForSet().add("article:" + id + ":tags", tags.toArray());
-            tags.forEach(tag -> redisTemplate.opsForList().leftPush("tag:" + tag + ":articles", id));
+            tags.forEach(tag -> redisTemplate.opsForSet().add("tag:" + tag + ":articles", id));
         }
         return "文章添加成功！id为" + id;
     }
 
+    @GetMapping("/articles/tag/{tag}")
+    public List<Article> getByTag(@PathVariable String tag) {
+        String key = "tag:" + tag + ":articles";
+        Set ids = redisTemplate.opsForSet().members(key);
+        List<Article> articles = new ArrayList<>();
+        ids.forEach(id -> {
+            Map articleMap = redisTemplate.boundHashOps("article:" + id).entries();
+            if (articleMap == null || articleMap.size() == 0) {
+                redisTemplate.opsForSet().remove(key, id);
+            } else {
+                Article article = ((Article) hashMapper.fromHash(articleMap));
+                articles.add(article);
+            }
+        });
+        return articles;
+    }
+
     @PutMapping("/articles/{id}")
     public String update(Article article) {
+        Object id = redisTemplate.opsForHash().get("article:" + article.getId(), "id");
+        if (Objects.isNull(id)) return "文章不存在";
         String key = "article:" + article.getId();
         article.setUpdateTime(LocalDateTime.now());
         redisTemplate.opsForHash().putAll(key, hashMapper.toHash(article));
@@ -85,7 +103,9 @@ public class ArticleController {
     @DeleteMapping("/articles/{id}")
     public String delete(@PathVariable Integer id) {
         String key = "article:" + id;
-        redisTemplate.delete(key);
+        String commentKey = key + ":comments";
+        String tagKey = key + ":tags";
+        redisTemplate.delete(Arrays.asList(key, commentKey, tagKey));
         redisTemplate.opsForList().remove("article:list", 0, id);
         return "文章删除成功！id为：" + id;
     }
@@ -93,13 +113,9 @@ public class ArticleController {
     private Article setComments(Article article) {
         Map<String, Object> commentMap = redisTemplate.boundHashOps("article:" + article.getId() + ":comments").entries();
         List<Comment> comments = new ArrayList<>();
-        commentMap.entrySet().stream().forEach(e-> comments.add(objectMapper.convertValue(e.getValue(),Comment.class)));
+        commentMap.entrySet().stream().forEach(e -> comments.add(objectMapper.convertValue(e.getValue(), Comment.class)));
         article.setComments(comments);
-        return  article;
-    }
-
-    private void setTags(Article article) {
-
+        return article;
     }
 
 }
