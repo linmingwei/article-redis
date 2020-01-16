@@ -1,5 +1,6 @@
 package com.example.redis.entity;
 
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import lombok.Data;
 
 /**
@@ -8,6 +9,7 @@ import lombok.Data;
  * @Description:
  */
 @Data
+@JsonTypeInfo(use = JsonTypeInfo.Id.NONE)
 public class Comment {
     private Long id;
     private Long articleId;
