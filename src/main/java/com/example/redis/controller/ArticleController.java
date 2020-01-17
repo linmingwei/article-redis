@@ -2,9 +2,13 @@ package com.example.redis.controller;
 
 import com.example.redis.entity.Article;
 import com.example.redis.entity.Comment;
+import com.example.redis.util.CommonUtil;
+import com.example.redis.util.Page;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.query.SortQuery;
+import org.springframework.data.redis.core.query.SortQueryBuilder;
 import org.springframework.data.redis.hash.Jackson2HashMapper;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,29 +22,35 @@ import java.util.*;
  */
 @RestController
 public class ArticleController {
-    @Autowired
     private RedisTemplate redisTemplate;
+    private ObjectMapper objectMapper;
+    private Jackson2HashMapper hashMapper;
 
-    private Jackson2HashMapper hashMapper = new Jackson2HashMapper(false);
-    private ObjectMapper objectMapper = new ObjectMapper();
+    @Autowired
+    private ArticleController(RedisTemplate redisTemplate, ObjectMapper objectMapper) {
+        this.redisTemplate = redisTemplate;
+        this.objectMapper = objectMapper;
+        this.hashMapper = new Jackson2HashMapper(objectMapper, false);
+    }
 
 
     @GetMapping("/articles")
-    public List<Article> list() {
-        Jackson2HashMapper mapper;
-        mapper = new Jackson2HashMapper(false);
+    public Page list(Integer current, Integer size) {
+        Page page = new Page<Article>(current, size);
         List<Article> articles = new ArrayList<>();
-        List<Integer> ids = redisTemplate.opsForList().range("article:list", 0, -1);
+        Set<Integer> ids = redisTemplate.opsForZSet().reverseRange("article:list", page.getStart(), page.getEnd());
+        page.setTotal(redisTemplate.opsForZSet().size("article:list"));
         if (ids == null || ids.size() == 0) {
             return null;
         }
         ids.forEach(id -> {
             Map<String, Object> articleMap = redisTemplate.boundHashOps("article:" + id).entries();
-            Article article = (Article) mapper.fromHash(articleMap);
+            Article article = objectMapper.convertValue(articleMap, Article.class);
             setComments(article);
             articles.add(article);
         });
-        return articles;
+        page.setRecords(articles);
+        return page;
     }
 
     @GetMapping("/articles/{id}")
@@ -48,9 +58,9 @@ public class ArticleController {
         Map<String, Object> articleMap = redisTemplate.boundHashOps("article:" + id).entries();
         Article article = null;
         if (Objects.nonNull(articleMap) && articleMap.size() != 0) {
-            article = (Article) hashMapper.fromHash(articleMap);
+            article = (Article) objectMapper.convertValue(articleMap, Article.class);
+            setComments(article);
         }
-        setComments(article);
         return article;
     }
 
@@ -61,7 +71,7 @@ public class ArticleController {
         article.setId(id);
         article.setCreateTime(LocalDateTime.now());
         article.setUpdateTime(LocalDateTime.now());
-        redisTemplate.opsForList().leftPush("article:list", id);
+        redisTemplate.opsForZSet().add("article:list", id, CommonUtil.getTimestamps());
         String key = "article:" + id;
         Map<String, Object> toHash = hashMapper.toHash(article);
         redisTemplate.opsForHash().putAll(key, toHash);
@@ -74,16 +84,19 @@ public class ArticleController {
     }
 
     @GetMapping("/articles/tag/{tag}")
-    public List<Article> getByTag(@PathVariable String tag) {
+    public List<Article> getByTag(@PathVariable String tag, Integer current, Integer size) {
+        Page<Article> page = new Page<>(current, size);
         String key = "tag:" + tag + ":articles";
-        Set ids = redisTemplate.opsForSet().members(key);
+//        Set ids = redisTemplate.opsForSet().members(key);
+        SortQuery<String> query = SortQueryBuilder.sort(key).by("article:*->createTime").alphabetical(true).limit(page.getStart(), page.getSize()).build();
+        List ids = redisTemplate.sort(query);
         List<Article> articles = new ArrayList<>();
         ids.forEach(id -> {
             Map articleMap = redisTemplate.boundHashOps("article:" + id).entries();
             if (articleMap == null || articleMap.size() == 0) {
                 redisTemplate.opsForSet().remove(key, id);
             } else {
-                Article article = ((Article) hashMapper.fromHash(articleMap));
+                Article article = objectMapper.convertValue(articleMap, Article.class);
                 articles.add(article);
             }
         });
@@ -106,7 +119,7 @@ public class ArticleController {
         String commentKey = key + ":comments";
         String tagKey = key + ":tags";
         redisTemplate.delete(Arrays.asList(key, commentKey, tagKey));
-        redisTemplate.opsForList().remove("article:list", 0, id);
+        redisTemplate.opsForZSet().remove("article:list", id);
         return "文章删除成功！id为：" + id;
     }
 
